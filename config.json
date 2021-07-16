@@ -1,0 +1,38 @@
+{
+    "coinbasepro": {
+        "api_url": "https://api.pro.coinbase.com",
+        "config" : {
+            "base_currency" : "ETH",
+            "quote_currency" : "USD",
+            "live" : 0,
+            "sellatloss" : 0,
+            "smartswitch": 1,
+            "autorestart": 1,
+            "disablebullonly": 1,
+
+            "disablebuymacd": 0,
+            "disablebuyobv": 0,
+            "disablebuyelderray": 0,
+            "disablefailsafefibonaccilow": 0,
+            "disablefailsafelowerpcnt": 0,
+            "disableprofitbankupperpcnt": 0,
+            "disableprofitbankfibonaccihigh": 0,
+            "disableprofitbankreversal": 0,
+
+            "verbose": 0
+
+        },
+        "api_key_file": "coinbasepro.key"
+    },
+    "telegram": {
+        "token": "1899421094:AAGNEmMrFob5PJE-E2AxanaobNsAap9fAd0",
+        "client_id": "1454520186"
+    },
+    "logger" : {
+        "filelog": 1,
+        "logfile": "pycryptobot.log",
+        "fileloglevel": "DEBUG",
+        "consolelog": 1,
+        "consoleloglevel": "INFO"
+    }
+}
