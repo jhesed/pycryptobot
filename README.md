@@ -507,3 +507,10 @@ I've actually included this in the examples in how to start the bot that will do
 If you get stuck with anything email me or raise an issue in the repo and I'll help you sort it out. Raising an issue is probably better as the question and response may help others.
 
 Enjoy and happy trading! :)
+
+
+### ssh to gcloud
+```gcloud beta compute ssh --zone "us-east1-b" "pycryptobot"  --project "coinbase-pycryptobot"```
+
+### Upstart
+https://stackoverflow.com/questions/17747605/daemon-vs-upstart-for-python-script
