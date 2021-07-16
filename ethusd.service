@@ -1,0 +1,8 @@
+[Unit]
+Description=bot
+
+[Service]
+ExecStart=python3 /home/dev_jhesed/ETHUSD_bot/pycryptobot.py
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=adausd
