@@ -2,8 +2,8 @@
     "coinbasepro": {
         "api_url": "https://api.pro.coinbase.com",
         "config" : {
-            "base_currency" : "ETH",
-            "quote_currency" : "USD",
+            "base_currency" : "ADA",
+            "quote_currency" : "USDC",
             "live" : 0,
             "sellatloss" : 0,
             "smartswitch": 1,
