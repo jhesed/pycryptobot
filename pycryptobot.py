@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """Python Crypto Bot consuming Coinbase Pro or Binance APIs"""
 
 import functools
