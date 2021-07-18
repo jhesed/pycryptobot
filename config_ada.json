@@ -22,7 +22,7 @@
             "verbose": 0
 
         },
-        "api_key_file": "coinbasepro.key"
+        "api_key_file": "binance.key"
     },
     "telegram": {
         "token": "1899421094:AAGNEmMrFob5PJE-E2AxanaobNsAap9fAd0",

@@ -2,8 +2,8 @@
     "coinbasepro": {
         "api_url": "https://api.pro.coinbase.com",
         "config" : {
-            "base_currency" : "ADA",
-            "quote_currency" : "USDC",
+            "base_currency" : "ETH",
+            "quote_currency" : "USDT",
             "live" : 0,
             "sellatloss" : 0,
             "smartswitch": 1,
@@ -22,7 +22,7 @@
             "verbose": 0
 
         },
-        "api_key_file": "coinbasepro.key"
+        "api_key_file": "binance.key"
     },
     "telegram": {
         "token": "1899421094:AAGNEmMrFob5PJE-E2AxanaobNsAap9fAd0",
