@@ -6,17 +6,23 @@ import os
 import sched
 import sys
 import time
-import pandas as pd
 from datetime import datetime, timedelta
-from models.PyCryptoBot import PyCryptoBot, truncate as _truncate
+
+import pandas as pd
+
 from models.AppState import AppState
+from models.helper.LogHelper import Logger
+from models.helper.MarginHelper import calculate_margin
+from models.PyCryptoBot import PyCryptoBot
+from models.PyCryptoBot import truncate as _truncate
+from models.Stats import Stats
+from models.Strategy import Strategy
 from models.Trading import TechnicalAnalysis
 from models.TradingAccount import TradingAccount
-from models.Stats import Stats
-from models.helper.MarginHelper import calculate_margin
 from views.TradingGraphs import TradingGraphs
 from models.Strategy import Strategy
 from models.helper.LogHelper import Logger
+from models.helper.TextBoxHelper import TextBox
 
 # minimal traceback
 sys.tracebacklimit = 1
@@ -38,27 +44,28 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
     # connectivity check (only when running live)
     if app.isLive() and app.getTime() is None:
         Logger.warning('Your connection to the exchange has gone down, will retry in 1 minute!')
-
-        # poll every 5 minute
+        app.notifyTelegram('Bot for ' + app.getMarket() + ' got Disconnected :( ')
+        # poll every 1 minute
         list(map(s.cancel, s.queue))
-        s.enter(300, 1, executeJob, (sc, app, state))
+        s.enter(60, 0.25, executeJob, (sc, app, state))
+        app.notifyTelegram('Bot for ' + app.getMarket() + ' Attempting reconnect :) ')
         return
 
     # increment state.iterations
     state.iterations = state.iterations + 1
-    
+
     if not app.isSimulation():
         # retrieve the app.getMarket() data
         trading_data = app.getHistoricalData(app.getMarket(), app.getGranularity())
-        
+
     else:
         if len(trading_data) == 0:
             return None
 
     # analyse the market data
-    if app.isSimulation() and len(trading_data.columns) > 8:    										
+    if app.isSimulation() and len(trading_data.columns) > 8:
         df = trading_data
-														  																		 
+
         # if smartswitch then get the market data using new granularity
         if app.sim_smartswitch:
             df_last = app.getInterval(df, state.iterations)
@@ -77,9 +84,9 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                     endDate = app.getDateFromISO8601Str(str(df.tail(1).index.format()[0]))
 
                 simDate = app.getDateFromISO8601Str(str(df_last.index.format()[0]))
-                
+
                 trading_data = app.getSmartSwitchHistoricalDataChained(app.getMarket(), app.getGranularity(), str(startDate), str(endDate), str(simDate))
-                
+
                 if app.getGranularity() == 3600:
                     simDate = app.getDateFromISO8601Str(str(simDate))
                     sim_rounded = pd.Series(simDate).dt.round('60min')
@@ -88,24 +95,24 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                     simDate = app.getDateFromISO8601Str(str(simDate))
                     sim_rounded = pd.Series(simDate).dt.round('15min')
                     simDate = sim_rounded[0]
-                    
+
                 state.iterations = trading_data.index.get_loc(str(simDate))
 
                 if state.iterations == 0:
                     state.iterations = 1
                 elif app.getGranularity() == 3600:
-                    state.iterations += 2            
+                    state.iterations += 2
                 elif app.getGranularity() == 900:
-                    state.iterations -= 2 
+                    state.iterations -= 2
 
                 trading_dataCopy = trading_data.copy()
                 technical_analysis = TechnicalAnalysis(trading_dataCopy)
 
                 if 'morning_star' not in df:
                     technical_analysis.addAll()
-                    
+
                 df = technical_analysis.getDataFrame()
-                
+
                 app.sim_smartswitch = False
 
         elif app.getSmartSwitch() == 1 and technical_analysis is None:
@@ -128,7 +135,7 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
         df_last = app.getInterval(df, state.iterations)
     else:
         df_last = app.getInterval(df)
-    
+
     if len(df_last.index.format()) > 0:
         current_df_index = str(df_last.index.format()[0])
     else:
@@ -141,10 +148,10 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
     # use actual sim mode date to check smartchswitch
     if app.getSmartSwitch() == 1 and app.getGranularity() == 3600 and app.is1hEMA1226Bull(current_sim_date) is True and app.is6hEMA1226Bull(current_sim_date) is True:
         Logger.info('*** smart switch from granularity 3600 (1 hour) to 900 (15 min) ***')
-        
+
         if app.isSimulation():
             app.sim_smartswitch = True
-        
+
         app.notifyTelegram(app.getMarket() + " smart switch from granularity 3600 (1 hour) to 900 (15 min)")
 
         app.setGranularity(900)
@@ -154,10 +161,10 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
     # use actual sim mode date to check smartchswitch
     if app.getSmartSwitch() == 1 and app.getGranularity() == 900 and app.is1hEMA1226Bull(current_sim_date) is False and app.is6hEMA1226Bull(current_sim_date) is False:
         Logger.info("*** smart switch from granularity 900 (15 min) to 3600 (1 hour) ***")
-        
+
         if app.isSimulation():
             app.sim_smartswitch = True
-        
+
         app.notifyTelegram(app.getMarket() + " smart switch from granularity 900 (15 min) to 3600 (1 hour)")
 
         app.setGranularity(3600)
@@ -236,7 +243,7 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
         two_black_gapping = bool(df_last['two_black_gapping'].values[0])
 
         strategy = Strategy(app, state, df, state.iterations)
-        state.action = strategy.getAction()
+        state.action = strategy.getAction(price)
 
         immediate_action = False
         margin, profit, sell_fee = 0, 0, 0
@@ -285,10 +292,9 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                 state.last_action = 'BUY'
                 immediate_action = True
 
-            # handle overriding wait actions (do not sell if sell at loss disabled!)
-            if strategy.isWaitTrigger(margin):
+            # handle overriding wait actions (e.g. do not sell if sell at loss disabled!, do not buy in bull if bull only)
+            if strategy.isWaitTrigger(margin, goldencross):
                 state.action = 'WAIT'
-                state.last_action = 'BUY'
                 immediate_action = False
 
         bullbeartext = ''
@@ -302,6 +308,8 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
         # polling is every 5 minutes (even for hourly intervals), but only process once per interval
         #Logger.debug("DateCheck: " + str(immediate_action) + ' ' + str(state.last_df_index) + ' ' + str(current_df_index))
         if (immediate_action is True or state.last_df_index != current_df_index):
+            textBox = TextBox(80, 22)
+
             precision = 4
 
             if (price < 0.01):
@@ -454,12 +462,14 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                                   app.printGranularity() + ' | ' + price_text + ' | ' + ema_co_prefix + \
                                   ema_text + ema_co_suffix + macd_co_prefix + macd_text + macd_co_suffix + \
                                   obv_prefix + obv_text + obv_suffix + state.eri_text + state.action + \
-                                  ' | Last Action: ' + state.last_action
+                                  ' | Last Action: ' + state.last_action + ' | DF HIGH: ' + str(df['close'].max()) + ' | ' + 'DF LOW: ' + str(df['close'].min()) + ' | SWING: ' +str(round(((df['close'].max()-df['close'].min()) / df['close'].min())*100, 2)) + '% |' + \
+                                  ' CURR Price is ' + str(round(((price-df['close'].max()) / df['close'].max())*100, 2)) + '% ' + 'away from DF HIGH | Range: ' + str(df.iloc[0, 0]) + ' <--> ' + str(df.iloc[len(df)-1, 0])
                 else:
                     output_text = formatted_current_df_index + ' | ' + app.getMarket() + bullbeartext + ' | ' + \
                                   app.printGranularity() + ' | ' + price_text + ' | ' + ema_co_prefix + \
                                   ema_text + ema_co_suffix + macd_co_prefix + macd_text + macd_co_suffix + \
-                                  obv_prefix + obv_text + obv_suffix + state.eri_text + state.action + ' '
+                                  obv_prefix + obv_text + obv_suffix + state.eri_text + state.action + ' | DF HIGH: ' + str(df['close'].max()) + ' | ' + 'DF LOW: ' + str(df['close'].min()) + ' | SWING: ' +str(round(((df['close'].max()-df['close'].min()) / df['close'].min())*100, 2)) + '%' + \
+                                  ' CURR Price is ' + str(round(((price-df['close'].max()) / df['close'].max())*100, 2)) + '% ' + 'away from DF HIGH | Range: ' +str(df.iloc[0, 0]) + ' <--> ' +str(df.iloc[len(df)-1, 0])
 
                 if state.last_action == 'BUY':
                     if state.last_buy_size > 0:
@@ -511,76 +521,56 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                 Logger.debug('obv_pc: ' + str(obv_pc))
                 Logger.debug('action: ' + state.action)
 
-                # informational output on the most recent entry  
+                # informational output on the most recent entry
                 Logger.info('')
-                Logger.info('================================================================================')
-                txt = '        Iteration : ' + str(state.iterations) + bullbeartext
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                txt = '        Timestamp : ' + str(df_last.index.format()[0])
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                Logger.info('--------------------------------------------------------------------------------')
-                txt = '            Close : ' + truncate(price)
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                txt = '            EMA12 : ' + truncate(float(df_last['ema12'].values[0]))
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                txt = '            EMA26 : ' + truncate(float(df_last['ema26'].values[0]))
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                txt = '   Crossing Above : ' + str(ema12gtema26co)
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                txt = '  Currently Above : ' + str(ema12gtema26)
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                txt = '   Crossing Below : ' + str(ema12ltema26co)
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                txt = '  Currently Below : ' + str(ema12ltema26)
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
+                textBox.doubleLine()
+                textBox.line('Iteration', str(state.iterations) + bullbeartext)
+                textBox.line('Timestamp', str(df_last.index.format()[0]))
+                textBox.singleLine()
+                textBox.line('Close', truncate(price))
+                textBox.line('EMA12', truncate(float(df_last['ema12'].values[0])))
+                textBox.line('EMA26', truncate(float(df_last['ema26'].values[0])))
+                textBox.line('Crossing Above', str(ema12gtema26co))
+                textBox.line('Currently Above', str(ema12gtema26))
+                textBox.line('Crossing Below', str(ema12ltema26co))
+                textBox.line('Currently Below', str(ema12ltema26))
 
                 if (ema12gtema26 is True and ema12gtema26co is True):
-                    txt = '        Condition : EMA12 is currently crossing above EMA26'
+                    textBox.line('Condition', 'EMA12 is currently crossing above EMA26')
                 elif (ema12gtema26 is True and ema12gtema26co is False):
-                    txt = '        Condition : EMA12 is currently above EMA26 and has crossed over'
+                    textBox.line('Condition', 'EMA12 is currently above EMA26 and has crossed over')
                 elif (ema12ltema26 is True and ema12ltema26co is True):
-                    txt = '        Condition : EMA12 is currently crossing below EMA26'
+                    textBox.line('Condition', 'EMA12 is currently crossing below EMA26')
                 elif (ema12ltema26 is True and ema12ltema26co is False):
-                    txt = '        Condition : EMA12 is currently below EMA26 and has crossed over'
+                    textBox.line('Condition', 'EMA12 is currently below EMA26 and has crossed over')
                 else:
-                    txt = '        Condition : -'
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
+                    textBox.line('Condition', '-')
 
-                txt = '            SMA20 : ' + truncate(float(df_last['sma20'].values[0]))
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                txt = '           SMA200 : ' + truncate(float(df_last['sma200'].values[0]))
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-
-                Logger.info('--------------------------------------------------------------------------------')
-                txt = '             MACD : ' + truncate(float(df_last['macd'].values[0]))
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                txt = '           Signal : ' + truncate(float(df_last['signal'].values[0]))
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                txt = '  Currently Above : ' + str(macdgtsignal)
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                txt = '  Currently Below : ' + str(macdltsignal)
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
+                textBox.line('SMA20', truncate(float(df_last['sma20'].values[0])))
+                textBox.line('SMA200', truncate(float(df_last['sma200'].values[0])))
+                textBox.singleLine()
+                textBox.line('MACD', truncate(float(df_last['macd'].values[0])))
+                textBox.line('Signal', truncate(float(df_last['signal'].values[0])))
+                textBox.line('Currently Above', str(macdgtsignal))
+                textBox.line('Currently Below', str(macdltsignal))
 
                 if (macdgtsignal is True and macdgtsignalco is True):
-                    txt = '        Condition : MACD is currently crossing above Signal'
+                    textBox.line('Condition', 'MACD is currently crossing above Signal')
                 elif (macdgtsignal is True and macdgtsignalco is False):
-                    txt = '        Condition : MACD is currently above Signal and has crossed over'
+                    textBox.line('Condition', 'MACD is currently above Signal and has crossed over')
                 elif (macdltsignal is True and macdltsignalco is True):
-                    txt = '        Condition : MACD is currently crossing below Signal'
+                    textBox.line('Condition', 'MACD is currently crossing below Signal')
                 elif (macdltsignal is True and macdltsignalco is False):
-                    txt = '        Condition : MACD is currently below Signal and has crossed over'
+                    textBox.line('Condition', 'MACD is currently below Signal and has crossed over')
                 else:
-                    txt = '        Condition : -'
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
+                    textBox.line('Condition', '-')
 
-                Logger.info('--------------------------------------------------------------------------------')
-                txt = '           Action : ' + state.action
-                Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                Logger.info('================================================================================')
+                textBox.singleLine()
+                textBox.line('Action', state.action)
+                textBox.doubleLine()
                 if state.last_action == 'BUY':
-                    txt = '           Margin : ' + margin_text
-                    Logger.info(' | ' + txt + (' ' * (75 - len(txt))) + ' | ')
-                    Logger.info('================================================================================')
+                    textBox.line('Margin', margin_text)
+                    textBox.doubleLine()
 
             # if a buy signal
             if state.action == 'BUY':
@@ -594,9 +584,9 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                     if not app.isVerbose():
                         Logger.info(formatted_current_df_index + ' | ' + app.getMarket() + ' | ' + app.printGranularity() +  ' | ' + price_text + ' | BUY')
                     else:
-                        Logger.info('--------------------------------------------------------------------------------')
-                        Logger.info('|                      *** Executing LIVE Buy Order ***                        |')
-                        Logger.info('--------------------------------------------------------------------------------')
+                        textBox.singleLine()
+                        textBox.center('*** Executing LIVE Buy Order ***')
+                        textBox.singleLine()
 
                     # display balances
                     Logger.info(app.getBaseCurrency() + ' balance before order: ' + str(account.getBalance(app.getBaseCurrency())))
@@ -616,17 +606,17 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                 # if not live
                 else:
                     app.notifyTelegram(app.getMarket() + ' (' + app.printGranularity() + ') TEST BUY at ' + price_text)
-                    # TODO: Improve simulator calculations by including calculations for buy and sell limit configurations. 
-                    if state.last_buy_size == 0 and state.last_buy_filled == 0: 
+                    # TODO: Improve simulator calculations by including calculations for buy and sell limit configurations.
+                    if state.last_buy_size == 0 and state.last_buy_filled == 0:
                         state.last_buy_size = 1000
                         state.first_buy_size = 1000
 
                     state.buy_count = state.buy_count + 1
-                    state.buy_sum = state.buy_sum + state.last_buy_size    
+                    state.buy_sum = state.buy_sum + state.last_buy_size
 
                     if not app.isVerbose():
                         Logger.info(formatted_current_df_index + ' | ' + app.getMarket() + ' | ' + app.printGranularity() + ' | ' + price_text + ' | BUY')
-                        
+
                         if app.getSmartSwitch():
                             # make a copy of the technical_analysis up until the current_sim_date
                             # use this to get the correct Fibonacci Retracement Levels for the current_sim_date
@@ -639,7 +629,7 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                             technical_analysis.printSupportResistanceLevel(float(price))
 
                         Logger.info(' Fibonacci Retracement Levels:' + str(bands))
-                        
+
                         if len(bands) >= 1 and len(bands) <= 2:
                             if len(bands) == 1:
                                 first_key = list(bands.keys())[0]
@@ -659,10 +649,9 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                                 state.fib_high = bands[second_key]
 
                     else:
-						
-                        Logger.info('--------------------------------------------------------------------------------')
-                        Logger.info('|                      *** Executing TEST Buy Order ***                        |')
-                        Logger.info('--------------------------------------------------------------------------------')
+                        textBox.singleLine()
+                        textBox.center('*** Executing TEST Buy Order ***')
+                        textBox.singleLine()
 
                 if app.shouldSaveGraphs():
                     tradinggraphs = TradingGraphs(technical_analysis)
@@ -703,9 +692,9 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                                 state.fib_high = bands[second_key]
 
                     else:
-                        Logger.info('--------------------------------------------------------------------------------')
-                        Logger.info('|                      *** Executing LIVE Sell Order ***                        |')
-                        Logger.info('--------------------------------------------------------------------------------')
+                        textBox.singleLine()
+                        textBox.center('*** Executing LIVE Sell Order ***')
+                        textBox.singleLine()
 
                     # display balances
                     Logger.info(app.getBaseCurrency() + ' balance before order: ' + str(account.getBalance(app.getBaseCurrency())))
@@ -722,12 +711,12 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                 # if not live
                 else:
                     margin, profit, sell_fee = calculate_margin(
-                        buy_size=state.last_buy_size, 
-                        buy_filled=state.last_buy_filled, 
-                        buy_price=state.last_buy_price, 
-                        buy_fee=state.last_buy_fee, 
-                        sell_percent=app.getSellPercent(), 
-                        sell_price=price, 
+                        buy_size=state.last_buy_size,
+                        buy_filled=state.last_buy_filled,
+                        buy_price=state.last_buy_price,
+                        buy_fee=state.last_buy_fee,
+                        sell_percent=app.getSellPercent(),
+                        sell_price=price,
                         sell_taker_fee=app.getTakerFee())
 
                     if state.last_buy_size > 0:
@@ -757,9 +746,9 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                                      margin_text + ' | MARGIN FEES | ' + str(round(sell_fee, precision)))
 
                     else:
-                        Logger.info('--------------------------------------------------------------------------------')
-                        Logger.info('|                      *** Executing TEST Sell Order ***                        |')
-                        Logger.info('--------------------------------------------------------------------------------')
+                        textBox.singleLine()
+                        textBox.center('*** Executing TEST Sell Order ***')
+                        textBox.singleLine()
 
                 if app.shouldSaveGraphs():
                     tradinggraphs = TradingGraphs(technical_analysis)
@@ -791,7 +780,7 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                     Logger.info('               simulation which may not be ideal. Try setting --sellatloss 1')
 
                 Logger.info("\n")
-                Logger.info('   Buy Count : ' + str(state.buy_count))                
+                Logger.info('   Buy Count : ' + str(state.buy_count))
                 Logger.info('  Sell Count : ' + str(state.sell_count))
                 Logger.info('   First Buy : ' + str(state.first_buy_size))
                 Logger.info('   Last Sell : ' + str(state.last_buy_size))
@@ -811,7 +800,7 @@ def executeJob(sc=None, app: PyCryptoBot=None, state: AppState=None, trading_dat
                 # show profit and margin if already bought
                 Logger.info(now + ' | ' + app.getMarket() + bullbeartext + ' | ' + app.printGranularity() + ' | Current Price: ' + str(price) + ' | Margin: ' + str(margin) + ' | Profit: ' + str(profit))
             else:
-                Logger.info(now + ' | ' + app.getMarket() + bullbeartext + ' | ' + app.printGranularity() + ' | Current Price: ' + str(price))
+                Logger.info(now + ' | ' + app.getMarket() + bullbeartext + ' | ' + app.printGranularity() + ' | Current Price: ' + str(price) +' is ' + str(round(((price-df['close'].max()) / df['close'].max())*100, 2)) + '% ' + 'away from DF HIGH')
 
             # decrement ignored iteration
             state.iterations = state.iterations - 1
@@ -849,7 +838,7 @@ def main():
             message += 'Coinbase Pro bot'
         elif app.getExchange() == 'binance':
             message += 'Binance bot'
-        
+
         smartSwitchStatus = 'enabled' if app.getSmartSwitch() else 'disabled'
         message += ' for ' + app.getMarket() + ' using granularity ' + app.printGranularity() + '. Smartswitch ' + smartSwitchStatus
         app.notifyTelegram(message)
