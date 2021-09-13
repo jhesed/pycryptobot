@@ -625,3 +625,12 @@ Enjoy and happy trading! :)
 
 ### Upstart
 https://stackoverflow.com/questions/17747605/daemon-vs-upstart-for-python-script
+
+### systemd
+Put these lines in a file called hello.service in /etc/systemd/system.
+
+Make sure your script file is executable by running sudo chmod +x <full_path_to_script>
+
+Now reload systemd by running sudo systemctl daemon-reload, start the service sudo systemctl start hello.
+
+Now you can check if the service is running or not using sudo systemctl status hello and stop it using sudo systemctl stop hello
