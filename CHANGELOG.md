@@ -5,8 +5,92 @@ Upgrade version:
 - git checkout main
 - git pull
 
-Upgrade library dependancies (if required):
+Upgrade library dependencies (if required):
 - python3 -m pip install -r requirements.txt -U
+
+## [3.6.0] - 2021-09-06
+
+### Added
+
+-- fixed williams %r indicator and added it to the websvc dashboard
+-- added adx14 indicator and added it to the websvc dashboard
+
+## [3.5.0] - 2021-09-05
+
+### Added
+
+-- added Seasonal ARIMA model predictions to websvc analysis
+
+## [3.4.0] - 2021-09-03
+
+### Changed
+
+-- update to smartswitch sim processing speed.
+-- update to sim summary to include total margin and profit/loss.
+-- fixed timestamp bug when using simstartdate.
+-- fixed graphs in sim mode.
+-- remove limit for sims using specific granularity.
+-- fix for profit and loss summary for simulations
+-- added trade history in simulation summary in verbose mode will also export to CSV '({market}{daterange}_trades.csv)'
+-- added trade history export to csv 'trades.csv'
+-- added web portal ./websvc.py
+
+## [3.3.1] - 2021-08-29
+
+### Changed
+
+-- added additional error handling for Coinbase Pro getTime()
+
+## [3.3.0] - 2021-08-28
+
+### Changed
+
+-- added "buynearhighpcnt" to specify the percentage from high that the bot should not buy if "disablebuynearhigh" is not specified.
+-- added a catch and display of exception message for getTime()
+
+## [3.2.15] - 2021-08-24
+
+### Changed
+
+-- add proper shebang and exec permissions to pycryptobot.py (run from CLI, etc.)
+
+## [3.2.14] - 2021-08-24
+
+### Changed
+
+-- Found and fixed 'currency' key exception
+-- Fixed simulation summary
+
+## [3.2.13] - 2021-08-23
+
+### Changed
+
+-- Binance US is missing 'tradeFee' API endpoint, now returns default fee for this url
+
+## [3.2.12] - 2021-08-23
+
+### Added
+
+-- Verbose debug option to isSellTrigger and isWaitTrigger
+
+### Changed
+
+-- Logic in isSellTrigger and isWaitTrigger
+
+## [3.2.11] - 2021-08-22
+
+### Changed
+
+-- Adjustment to isWaitTrigger
+-- Tidying up repo
+-- Fixed version
+
+## [3.2.10] - 2021-08-20
+
+### Changed
+
+-- 'stats' for binance was retuning incorrect percentage gains.
+-- 'statdetail' was not working for binance as some values were sting instead of float
 
 ## [3.2.9] - 2021-08-16
 

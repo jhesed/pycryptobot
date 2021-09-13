@@ -46,9 +46,15 @@ class AppState:
         self.last_buy_filled = 0
         self.last_buy_fee = 0
         self.last_buy_high = 0
+        self.last_sell_size = 0
         self.last_df_index = ""
         self.sell_count = 0
         self.sell_sum = 0
+
+        self.margintracker = 0
+        self.profitlosstracker = 0
+        self.feetracker = 0
+        self.buy_tracker = 0
 
     def minimumOrderBase(self):
         if self.app.getExchange() == "binance":
@@ -162,7 +168,6 @@ class AppState:
                 self.last_buy_price = 0.0
                 return
         else:
-
             # nil base or quote funds
             if base == 0.0 and quote == 0.0:
                 sys.tracebacklimit = 0

@@ -789,13 +789,13 @@ class TechnicalAnalysis:
         self.df["fbb_upper0_382"] = sma + (0.382 * sd)
         self.df["fbb_upper0_5"] = sma + (0.5 * sd)
         self.df["fbb_upper0_618"] = sma + (0.618 * sd)
-        self.df["fbb_upper0_764"] = sma + (0.764 * sd)
+        self.df["fbb_upper0_786"] = sma + (0.786 * sd)
         self.df["fbb_upper1"] = sma + (1 * sd)
         self.df["fbb_lower0_236"] = sma - (0.236 * sd)
         self.df["fbb_lower0_382"] = sma - (0.382 * sd)
         self.df["fbb_lower0_5"] = sma - (0.5 * sd)
         self.df["fbb_lower0_618"] = sma - (0.618 * sd)
-        self.df["fbb_lower0_764"] = sma - (0.764 * sd)
+        self.df["fbb_lower0_786"] = sma - (0.786 * sd)
         self.df["fbb_lower1"] = sma - (1 * sd)
 
     def movingAverageConvergenceDivergence(self) -> DataFrame:
@@ -900,9 +900,10 @@ class TechnicalAnalysis:
         if period < 7 or period > 21:
             raise ValueError("Period is out of range")
 
-        return (self.df["high"].rolling(14).max() - self.df["close"]) / (
-            self.df["high"].rolling(14).max() - self.df["low"].rolling(14).min()
-        )
+        return (
+            (self.df["high"].rolling(14).max() - self.df["close"]) /
+            (self.df["high"].rolling(14).max() - self.df["low"].rolling(14).min())
+        ) * -100
 
     def addRSI(self, period: int) -> None:
         """Adds the Relative Strength Index (RSI) to the DataFrame"""
@@ -931,18 +932,20 @@ class TechnicalAnalysis:
         )
 
         # sma3 stoch rsi
-        self.df['smastoch' + str(period)] = 100 * self.df['stochrsi' + str(period)].rolling(3, min_periods=1).mean()
-        self.df['rsi_value'] = self.df['smastoch' + str(period)]
+        self.df["smastoch" + str(period)] = (
+            100 * self.df["stochrsi" + str(period)].rolling(3, min_periods=1).mean()
+        )
+        self.df["rsi_value"] = self.df["smastoch" + str(period)]
 
         # true if sma stochrsi is above the 15
-        self.df['rsi15'] = self.df['smastoch' + str(period)] > 15
-        self.df['rsi15co'] = self.df.rsi15.ne(self.df.rsi15.shift())
-        self.df.loc[self.df['rsi15'] == False, 'rsi15co'] = False
+        self.df["rsi15"] = self.df["smastoch" + str(period)] > 15
+        self.df["rsi15co"] = self.df.rsi15.ne(self.df.rsi15.shift())
+        self.df.loc[self.df["rsi15"] == False, "rsi15co"] = False
 
         # true if sma stochrsi is below the 85
-        self.df['rsi85'] = self.df['smastoch' + str(period)] < 85
-        self.df['rsi85co'] = self.df.rsi85.ne(self.df.rsi85.shift())
-        self.df.loc[self.df['rsi85'] == False, 'rsi85co'] = False
+        self.df["rsi85"] = self.df["smastoch" + str(period)] < 85
+        self.df["rsi85co"] = self.df.rsi85.ne(self.df.rsi85.shift())
+        self.df.loc[self.df["rsi85"] == False, "rsi85co"] = False
 
     def addWilliamsR(self, period: int) -> None:
         """Adds the Willams %R to the DataFrame"""
@@ -1074,7 +1077,7 @@ class TechnicalAnalysis:
             self.addSMA(200)
 
         self.df["deathcross"] = self.df["sma50"] < self.df["sma200"]
-        self.df['bullsma50'] = self.df['sma50'] > self.df['sma50'].shift(1)
+        self.df["bullsma50"] = self.df["sma50"] > self.df["sma50"].shift(1)
 
     def addElderRayIndex(self) -> None:
         """Add Elder Ray Index"""

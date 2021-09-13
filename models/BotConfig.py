@@ -61,6 +61,7 @@ class BotConfig:
         self.statgroup = None
         self.statstartdate = None
         self.statdetail = False
+        self.buynearhighpcnt = 3
 
         self.disablebullonly = False
         self.disablebuynearhigh = False
@@ -248,7 +249,7 @@ class BotConfig:
         )
 
     def getVersionFromREADME(self) -> str:
-        regex = r"^# Python Crypto Bot (v(?:\d+.){2}\d(?:-[\w\d]+)?).*"
+        regex = r"^# Python Crypto Bot (v\d{1,3}\.\d{1,3}\.\d{1,3})"
         version = "v0.0.0"
         try:
             with open("README.md", "r", encoding="utf8") as stream:
@@ -375,6 +376,11 @@ class BotConfig:
             "--lastaction", type=str, help="optionally set the last action (BUY, SELL)"
         )
         parser.add_argument("--buymaxsize", type=float, help="maximum size on buy")
+        parser.add_argument(
+            "--buynearhighpcnt",
+            type=float,
+            help="optionally set the percent of the high for buying near high if enabled",
+        )
 
         # optional options
         parser.add_argument(
@@ -413,7 +419,7 @@ class BotConfig:
         parser.add_argument(
             "--disablebuynearhigh",
             action="store_true",
-            help="disable buy within 5 percent of high",
+            help="disable buy within 3 percent of high",
         )
         parser.add_argument(
             "--disablebuymacd", action="store_true", help="disable macd buy signal"

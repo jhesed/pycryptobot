@@ -476,7 +476,7 @@ class AuthAPI(AuthAPIBase):
                 elif row.action == "buy":
                     return float(row.cummulativeQuoteQty) / float(row.filled)
                 elif row.action == "sell":
-                    return float(row.cummulativeQuoteQty) / float(row.size)
+                    return float(row.cummulativeQuoteQty) / float(row.filled)
                 else:
                     return row.price
 
@@ -515,7 +515,8 @@ class AuthAPI(AuthAPIBase):
             # GET /api/v3/time
             resp = self.authAPI("GET", "/api/v3/time")
             return self.convert_time(int(resp["serverTime"]))
-        except:
+        except Exception as e:
+            Logger.error(f"Error: {e}")
             return None
 
     def getMarketInfoFilters(self, market: str) -> pd.DataFrame:
@@ -546,6 +547,10 @@ class AuthAPI(AuthAPIBase):
 
     def getTradeFee(self, market: str) -> float:
         """Retrieves the trade fees"""
+
+        # Binance US does not currently define "/sapi/v1/asset/tradeFee" in its API
+        if self._api_url == "https://api.binance.us":
+            return DEFAULT_TRADE_FEE_RATE
 
         try:
             # GET /sapi/v1/asset/tradeFee
@@ -788,7 +793,7 @@ class AuthAPI(AuthAPIBase):
             if self.die_on_api_error:
                 raise SystemExit(err)
             else:
-                Logger.debug(err)
+                Logger.error(err)
                 return {}
         else:
             if self.die_on_api_error:
@@ -831,8 +836,17 @@ class PublicAPI(AuthAPIBase):
             # GET /api/v3/time
             resp = self.authAPI("GET", "/api/v3/time")
             return self.convert_time(int(resp["serverTime"]))
-        except:
+        except Exception as e:
+            Logger.error(f"Error: {e}")
             return None
+
+    def getMarkets24HrStats(self) -> pd.DataFrame():
+        """Retrieves exchange markets 24hr stats"""
+
+        try:
+            return self.authAPI("GET", "/api/v3/ticker/24hr")
+        except:
+            return pd.DataFrame()
 
     def getTicker(self, market: str = DEFAULT_MARKET) -> tuple:
         """Retrives the market ticker"""
@@ -1039,7 +1053,7 @@ class PublicAPI(AuthAPIBase):
             if self.die_on_api_error:
                 raise SystemExit(err)
             else:
-                Logger.debug(err)
+                Logger.error(err)
                 return {}
         else:
             if self.die_on_api_error:
